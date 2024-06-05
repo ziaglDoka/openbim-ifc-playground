@@ -12,8 +12,8 @@
   "dependencies": {
     "@hono/node-server": "^1.11.1",
     "@prisma/client": "^5.13.0",
-    "@thatopen/components": "^2.0.0-alpha.10",
-    "@thatopen/fragments": "^2.0.0-alpha.5",
+    "@thatopen/components": "^2.0.6",
+    "@thatopen/fragments": "^2.0.4",
     "hono": "^4.2.9",
     "nanoid": "^5.0.7",
     "web-ifc": "0.0.53"
