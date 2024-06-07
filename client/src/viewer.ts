@@ -1,57 +1,181 @@
-import * as OBC from "openbim-components";
-import * as THREE from "three";
+import * as dat from "three/examples/jsm/libs/lil-gui.module.min";
+import * as OBC from "@thatopen/components";
+import * as OBCF from "@thatopen/components-front";
+import * as BUI from "@thatopen/ui";
+import Stats from "three/examples/jsm/libs/stats.module.js";
+import * as CUI from "@thatopen/ui-obc";
 
 const SERVER_BASE_URL = "http://localhost:3000/files/models";
 
 export async function initializeViewer(modelId: string) {
-  const modelUrl = `${SERVER_BASE_URL}/${modelId}`;
-  const viewerContainer = document.getElementById("viewerContainer");
-  if (!viewerContainer) {
-    throw new Error('Element with id "viewerContainer" not found');
-  }
+  let modelUrl = `${SERVER_BASE_URL}/${modelId}`;
+  console.log(modelUrl);
 
-  viewerContainer.innerHTML = "";
-
-  const viewerEl = document.createElement("div");
-  viewerEl.style.width = "800px";
-  viewerEl.style.height = "500px";
-  viewerEl.style.backgroundColor = "#ddd";
-
-  viewerContainer.appendChild(viewerEl);
+  BUI.Manager.registerComponents();
+  
+  const viewport = BUI.Component.create<BUI.Viewport>(() => {
+    return BUI.html`<bim-viewport></bim-viewport>`;
+  });
 
   const components = new OBC.Components();
 
-  const scene = new OBC.SimpleScene(components);
-  components.scene = scene;
-  scene.setup(); // adds lights
+  const worlds = components.get(OBC.Worlds);
 
-  components.renderer = new OBC.SimpleRenderer(components, viewerEl);
-  components.raycaster = new OBC.SimpleRaycaster(components);
+  const world = worlds.create<
+    OBC.SimpleScene,
+    OBC.SimpleCamera,
+    OBC.SimpleRenderer
+  >();
 
-  const camera = new OBC.SimpleCamera(components);
-  camera.controls.setLookAt(12, 6, 8, 0, 0, -10);
-  camera.controls.addEventListener("controlend", () => {
-    loader.culler.needsUpdate = true;
-  });
-  components.camera = camera;
-
-  new OBC.SimpleGrid(components, new THREE.Color(0x666666)); // has to be loaded after camera
+  world.scene = new OBC.SimpleScene(components);
+  world.renderer = new OBC.SimpleRenderer(components, viewport);
+  world.camera = new OBC.SimpleCamera(components);
 
   components.init();
 
-  const loader = new OBC.FragmentStreamLoader(components);
-  loader.useCache = true;
+  world.scene.setup();
+
+  world.camera.controls.setLookAt(12, 6, 8, 0, 0, -10);
+
+  const grids = components.get(OBC.Grids);
+  grids.create(world);
+
+  const loader = components.get(OBCF.IfcStreamer);
+  loader.world = world;
   loader.url = `${modelUrl}/`; // implicitly loads ifc-processed-global and ifc-processed-geometries-0 files from this url
   loader.culler.threshold = 20;
   loader.culler.maxHiddenTime = 1000;
   loader.culler.maxLostTime = 40000;
 
-  const settingsUrl = `${modelUrl}/ifc-processed.json`;
-  const streamLoaderSettings = await fetch(settingsUrl).then((res) =>
-    res.json()
+  // inline function to load a model
+  async function loadModel() {
+    const geometryURL = `${modelUrl}/ifc-processed.json`;
+    const propertiesURL = `${modelUrl}/ifc-processed-properties.json`;
+    const rawGeometryData = await fetch(geometryURL);
+    const geometryData = await rawGeometryData.json();
+    let propertiesData;
+    if (propertiesURL) {
+      const rawPropertiesData = await fetch(propertiesURL);
+      propertiesData = await rawPropertiesData.json();
+    }
+  
+    const model = await loader.load(geometryData, true, propertiesData);
+    console.log("Model loaded");
+    console.log(model);
+  }
+
+  // initially load given model
+  loadModel();
+
+  // updating streamer
+  world.camera.controls.addEventListener("sleep", () => {
+    loader.culler.needsUpdate = true;
+  });
+
+  // inline function to clear cache
+  async function clearCache() {
+    await loader.clearCache();
+    window.location.reload();
+    console.log("Cache cleared");
+  }
+
+  // activate cache
+  loader.useCache = true;
+
+  // define properties table
+  const [propertiesTable, updatePropertiesTable] = CUI.tables.elementProperties({
+    components,
+    fragmentIdMap: {},
+  });
+  
+  propertiesTable.preserveStructureOnFilter = true;
+  propertiesTable.indentationInText = false;
+
+  const highlighter = components.get(OBCF.Highlighter);
+  highlighter.setup({ world });
+
+  highlighter.events.select.onHighlight.add((fragmentIdMap) => {
+    updatePropertiesTable({ fragmentIdMap });
+  });
+
+  highlighter.events.select.onClear.add(() =>
+    updatePropertiesTable({ fragmentIdMap: {} }),
+  );
+  
+  // define properties panel
+  const propertiesPanel = BUI.Component.create(() => {
+    const onTextInput = (e: Event) => {
+      const input = e.target as BUI.TextInput;
+      propertiesTable.queryString = input.value !== "" ? input.value : null;
+    };
+  
+    const expandTable = (e: Event) => {
+      const button = e.target as BUI.Button;
+      propertiesTable.expanded = !propertiesTable.expanded;
+      button.label = propertiesTable.expanded ? "Collapse" : "Expand";
+    };
+  
+    return BUI.html`
+      <bim-panel label="Properties">
+        <bim-panel-section label="Element Data">
+          <div style="display: flex; gap: 0.5rem;">
+            <bim-button @click=${expandTable} label=${propertiesTable.expanded ? "Collapse" : "Expand"}></bim-button> 
+            <bim-text-input @input=${onTextInput} placeholder="Search Property" debounce="250"></bim-text-input> 
+          </div>
+          ${propertiesTable}
+        </bim-panel-section>
+      </bim-panel>
+    `;
+  });
+
+  // add properties panel
+  const app = document.createElement("bim-grid");
+  app.layouts = {
+    main: {
+      // bottom row
+      template: `
+        "viewport 1fr"
+        "propertiesPanel 1fr"
+      `,
+      // left side panel
+      /*template: `
+        "propertiesPanel viewport"
+        /25rem 1fr
+      `,*/
+      elements: { propertiesPanel, viewport },
+    },
+  };
+
+  app.layout = "main";
+  document.body.append(app);
+  
+  setTimeout(
+    () => window.dispatchEvent(new Event('resize')),
+    200 
   );
 
-  loader.load(streamLoaderSettings);
+  // GUI
+  const gui = new dat.GUI();
 
-  return components;
+  const params = {
+    textField: modelId
+  }
+
+  gui.add(params, "textField").name( 'Model ID' ).onFinishChange((value: string) => {
+    modelUrl = `${SERVER_BASE_URL}/${value}`;
+  });
+
+  gui.add({ loadModel }, "loadModel").name( 'Load Model');
+  gui.add({ clearCache }, "clearCache").name( 'Clear Model Cache ');
+
+  // measuring performance
+  const stats = new Stats();
+  stats.showPanel(2);
+  document.body.append(stats.dom);
+  stats.dom.style.left = "0px";
+  stats.dom.style.zIndex = "unset";
+  world.renderer.onBeforeUpdate.add(() => stats.begin());
+  world.renderer.onAfterUpdate.add(() => stats.end());
 }
+
+

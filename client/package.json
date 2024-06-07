@@ -21,6 +21,10 @@
   },
   "packageManager": "npm@10.5.1+sha256.06b9421a6b708ed6b6c0840e54729851e067b45ad911b192ebee2cb03b0adef2",
   "dependencies": {
+    "@thatopen/components": "^2.0.8",
+    "@thatopen/components-front": "^2.0.8",
+    "@thatopen/ui": "^2.0.8",
+    "@thatopen/ui-obc": "^2.0.9",
     "bim-fragment": "^1.5.0",
     "consola": "^3.2.3",
     "nanotar": "^0.1.1",

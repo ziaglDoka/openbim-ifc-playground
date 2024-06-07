@@ -4,9 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Viewer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+  
+      html {
+        font-family: sans-serif;
+      }
+  
+      body {
+        background-color: var(--bim-ui_bg-base);
+        height: 100vh;
+        width: 100vw;
+      }
+  
+      bim-table {
+        grid-area: table;
+        width: 100%;
+      }
+      </style>
   </head>
   <body>
-    <h1>fragment streamer</h1>
+    <!--<h1>fragment streamer</h1>
 
     <p>
       Configure which model to load by changing <code>MODEL_UUID</code> in
@@ -19,9 +41,16 @@
       <label for="id">Model ID:</label>
       <input type="text" id="id" name="id" value="LHS10IpZ" />
       <input type="submit" value="Load model" />
-    </form>
+    </form>-->
 
-    <div id="viewerContainer"></div>
+    <!--<bim-viewport id="viewerContainer" style="grid-area: viewer;"></bim-viewport>
+    <bim-panel name="entityAttributes" label="Entity Attributes"></bim-panel>-->
+    <!--<bim-viewport id="viewerContainer" style="grid-area: viewer;"></bim-viewport>
+    <bim-panel id="properties" name="entityAttributes" label="Entity Attributes"></bim-panel>
+    <bim-grid id="grid">
+      
+      
+    </bim-grid>-->
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
